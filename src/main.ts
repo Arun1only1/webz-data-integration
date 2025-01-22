@@ -1,8 +1,20 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
+import { ConsoleLogger, Logger } from '@nestjs/common';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
-  await app.listen(process.env.PORT ?? 3000);
+  const app = await NestFactory.create(AppModule, {
+    logger: new ConsoleLogger({
+      prefix: 'WEBZ',
+      timestamp: true,
+      logLevels: ['log', 'error', 'warn'],
+    }),
+  });
+
+  const PORT = process.env.API_PORT ?? 8080;
+
+  await app.listen(PORT, () => {
+    Logger.log(`Server is running on port: ${PORT}`);
+  });
 }
 bootstrap();
