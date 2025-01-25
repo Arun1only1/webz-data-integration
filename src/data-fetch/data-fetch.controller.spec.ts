@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { DataFetchController } from './data-fetch.controller';
-import { DataFetchService } from './data-fetch.service';
+import { DataFetchService } from './service/data-fetch.service';
 
 describe('DataFetchController', () => {
   let controller: DataFetchController;

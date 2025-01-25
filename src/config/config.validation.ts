@@ -15,4 +15,7 @@ export const configValidationSchema = Joi.object({
   DB_USERNAME: Joi.string().required().trim(),
   DB_PASSWORD: Joi.string().required().trim(),
   DB_NAME: Joi.string().required().trim(),
+
+  WEBZ_IO_API_KEY: Joi.string().required().trim(),
+  WEBZ_NEWS_URL: Joi.string().required().trim(),
 });
