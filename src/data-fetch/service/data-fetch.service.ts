@@ -16,6 +16,7 @@ import { NewsResponse } from '../dto/response/news.response';
 import { PaginationInput } from '../dto/input/pagination.input';
 import { QueryBuilderService } from '../../utils/query.builder.service';
 import { QueryInput } from '../dto/input/fetch.news.input';
+import Lang from '../../constants/language';
 
 @Injectable()
 export class DataFetchService {
@@ -42,6 +43,8 @@ export class DataFetchService {
     return await this.newsRepository.save(news);
   }
 
+  // TODO: implement transaction
+  // ! block: api hit reached limit
   async fetchAndSaveNews(
     query: QueryInput[],
     callback: (fetchedCount: number, remainingCount: number) => void,
@@ -50,8 +53,8 @@ export class DataFetchService {
     const token = this.configService.get<string>('WEBZ_IO_API_KEY');
 
     if (!token) {
-      this.logger.error('Web hose API Key not found');
-      throw new InternalServerErrorException('Web hose API Key not found');
+      this.logger.error(Lang.WEB_HOSE_API_KEY_NOT_FOUND);
+      throw new InternalServerErrorException(Lang.WEB_HOSE_API_KEY_NOT_FOUND);
     }
 
     // Fetching the base URL from the environment variables
@@ -81,7 +84,7 @@ export class DataFetchService {
         const response = await lastValueFrom(
           this.httpService.get(nextUrl || firstRequestUrl).pipe(
             catchError((error: AxiosError) => {
-              this.logger.error('API Hit Error:', error);
+              this.logger.error(Lang.API_HIT_ERROR, error);
               throw new InternalServerErrorException(error.message);
             }),
           ),
@@ -108,14 +111,14 @@ export class DataFetchService {
           fetchedNewsCount += records.length;
           totalResults = data?.totalResults;
         } else {
-          this.logger.error('Unexpected API response format:', data);
+          this.logger.error(Lang.UNEXPECTED_API_DATA_FORMAT, data);
           nextUrl = null;
           throw new InternalServerErrorException(
-            'Unexpected API response format',
+            Lang.UNEXPECTED_API_DATA_FORMAT,
           );
         }
       } catch (error) {
-        this.logger.error('Error fetching data:', error.message);
+        this.logger.error(Lang.DATA_FETCH_ERROR, error.message);
         nextUrl = null;
         throw new InternalServerErrorException(error.message);
       }

@@ -9,6 +9,7 @@ import { DataFetchService } from './service/data-fetch.service';
 import { News } from './entities/news.entity';
 import { QueryBuilderService } from '../utils/query.builder.service';
 import { QueryInput } from './dto/input/fetch.news.input';
+import Lang from '../constants/language';
 
 describe('DataFetchService', () => {
   let service: DataFetchService;
@@ -117,7 +118,7 @@ describe('DataFetchService', () => {
     const callback = jest.fn();
 
     await expect(service.fetchAndSaveNews(mockQuery, callback)).rejects.toThrow(
-      'Web hose API Key not found',
+      Lang.WEB_HOSE_API_KEY_NOT_FOUND,
     );
   });
 
@@ -140,7 +141,7 @@ describe('DataFetchService', () => {
     const callback = jest.fn();
 
     await expect(service.fetchAndSaveNews(mockQuery, callback)).rejects.toThrow(
-      'Unexpected API response format',
+      Lang.UNEXPECTED_API_DATA_FORMAT,
     );
   });
 });
