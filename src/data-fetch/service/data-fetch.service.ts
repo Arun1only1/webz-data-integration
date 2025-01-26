@@ -1,18 +1,26 @@
-import { HttpService } from '@nestjs/axios';
-import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { HttpService } from '@nestjs/axios';
 import { InjectRepository } from '@nestjs/typeorm';
-import { catchError, lastValueFrom } from 'rxjs';
-import { QueryBuilderService } from 'src/utils/query.builder.service';
-import { Repository } from 'typeorm';
+import {
+  Injectable,
+  InternalServerErrorException,
+  Logger,
+} from '@nestjs/common';
+
 import { AxiosError } from 'axios';
-import { NewsResponse } from '../dto/news.response';
+import { Repository } from 'typeorm';
+import { catchError, lastValueFrom } from 'rxjs';
+
 import { News } from '../entities/news.entity';
+import { NewsResponse } from '../dto/response/news.response';
+import { PaginationInput } from '../dto/input/pagination.input';
+import { QueryBuilderService } from '../../utils/query.builder.service';
 import { QueryInput } from '../dto/input/fetch.news.input';
 
 @Injectable()
 export class DataFetchService {
   private readonly logger = new Logger(DataFetchService.name);
+
   constructor(
     @InjectRepository(News) private readonly newsRepository: Repository<News>,
     private readonly configService: ConfigService,
@@ -20,8 +28,14 @@ export class DataFetchService {
     private readonly queryBuilderService: QueryBuilderService,
   ) {}
 
-  async findAllNews(): Promise<News[]> {
-    return await this.newsRepository.find();
+  async findAllNews({ page, limit }: PaginationInput): Promise<News[]> {
+    const skip = (page - 1) * limit;
+
+    return await this.newsRepository
+      .createQueryBuilder('news')
+      .skip(skip)
+      .take(limit)
+      .getMany();
   }
 
   async saveNews(news: { title: string; text: string }): Promise<News> {
@@ -37,22 +51,22 @@ export class DataFetchService {
 
     if (!token) {
       this.logger.error('Web hose API Key not found');
-      return;
+      throw new InternalServerErrorException('Web hose API Key not found');
     }
 
     // Fetching the base URL from the environment variables
     const baseUrl = this.configService.get<string>('WEBZ_NEWS_URL');
 
-    // Variables to keep track of the fetched news
+    // Variable to keep track of the fetched news
     let fetchedNewsCount: number = 0;
 
-    // Variables to keep track of the API response
+    // Variable to keep track of the API response
     let moreResultsAvailable: number = 0;
 
-    // Variables to keep track of the next URL
+    // Variable to keep track of the next URL
     let nextUrl: string | null = null;
 
-    // Variables to keep track of the total results
+    // Variable to keep track of the total results
     let totalResults: number = 0;
 
     // Building the query string
@@ -68,7 +82,7 @@ export class DataFetchService {
           this.httpService.get(nextUrl || firstRequestUrl).pipe(
             catchError((error: AxiosError) => {
               this.logger.error('API Hit Error:', error);
-              throw error;
+              throw new InternalServerErrorException(error.message);
             }),
           ),
         );
@@ -96,10 +110,14 @@ export class DataFetchService {
         } else {
           this.logger.error('Unexpected API response format:', data);
           nextUrl = null;
+          throw new InternalServerErrorException(
+            'Unexpected API response format',
+          );
         }
       } catch (error) {
-        this.logger.error('Error fetching data:', error);
+        this.logger.error('Error fetching data:', error.message);
         nextUrl = null;
+        throw new InternalServerErrorException(error.message);
       }
     } while (
       moreResultsAvailable > 0 &&

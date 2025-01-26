@@ -5,29 +5,36 @@ services:
     ports:
       - '8080:8080'
     environment:
-      - NODE_ENV=${NODE_ENV}
-      - API_PORT=${API_PORT}
-      - SYSTEM_LANGUAGE=${SYSTEM_LANGUAGE}
-
+      NODE_ENV: ${NODE_ENV}
+      API_PORT: ${API_PORT}
+      SYSTEM_LANGUAGE: ${SYSTEM_LANGUAGE}
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_USERNAME: arun
+      DB_PASSWORD: admin
+      DB_NAME: webz
+      WEBZ_IO_API_KEY: ${WEBZ_IO_API_KEY}
+      WEBZ_NEWS_URL: ${WEBZ_NEWS_URL}
+    volumes:
+      - .:/app
+    depends_on:
+      - db
     develop:
       watch:
         - action: sync
-          path: .
-          target: /app
+          path: ./web
+          target: /src/web
           ignore:
             - node_modules/
         - action: rebuild
           path: package.json
 
-    depends_on:
-      - db
-
   db:
     image: postgres:14-alpine
     environment:
-      POSTGRES_USER: ${DB_USERNAME}
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
-      POSTGRES_DB: ${DB_DATABASE}
+      POSTGRES_USER: arun
+      POSTGRES_PASSWORD: admin
+      POSTGRES_DB: webz
     ports:
       - '5432:5432'
     volumes:
