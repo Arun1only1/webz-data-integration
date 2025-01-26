@@ -5,6 +5,7 @@ import { PaginationInput } from './dto/input/pagination.input';
 import { GetNewsResponse } from './dto/response/get.news.response';
 import { MessageResponse } from './dto/response/message.response';
 import { DataFetchService } from './service/data-fetch.service';
+import Lang from '../constants/language';
 
 @Controller('news')
 export class DataFetchController {
@@ -24,7 +25,7 @@ export class DataFetchController {
       },
     );
 
-    return { message: 'News fetched and saved successfully.' };
+    return { message: Lang.NEWS_FETCHED_SUCCESSFULLY };
   }
 
   @Get('/all')
@@ -33,6 +34,6 @@ export class DataFetchController {
   ): Promise<GetNewsResponse> {
     const posts = await this.dataFetchService.findAllNews(paginationInput);
 
-    return { message: 'success', posts };
+    return { message: Lang.SUCCESS, posts };
   }
 }

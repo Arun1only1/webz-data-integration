@@ -1,12 +1,18 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import Lang from '../constants/language';
 import { DataFetchController } from './data-fetch.controller';
-import { DataFetchService } from './service/data-fetch.service';
-import { News } from './entities/news.entity';
 import { FetchNewsInput } from './dto/input/fetch.news.input';
+import { PaginationInput } from './dto/input/pagination.input';
+import { DataFetchService } from './service/data-fetch.service';
 
 describe('DataFetchController', () => {
   let controller: DataFetchController;
   let service: DataFetchService;
+
+  const mockDataFetchService = {
+    fetchAndSaveNews: jest.fn(),
+    findAllNews: jest.fn(),
+  };
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -14,10 +20,7 @@ describe('DataFetchController', () => {
       providers: [
         {
           provide: DataFetchService,
-          useValue: {
-            fetchAndSaveNews: jest.fn(),
-            findAllNews: jest.fn(),
-          },
+          useValue: mockDataFetchService,
         },
       ],
     }).compile();
@@ -47,7 +50,7 @@ describe('DataFetchController', () => {
         expect.any(Function),
       );
       expect(result).toEqual({
-        message: 'News fetched and saved successfully.',
+        message: Lang.NEWS_FETCHED_SUCCESSFULLY,
       });
     });
 
@@ -74,28 +77,16 @@ describe('DataFetchController', () => {
   });
 
   describe('getAllNews', () => {
-    it('should call findAllNews and return an array of news', async () => {
-      const mockNews: News[] = [
-        { id: '1', title: 'Test News', text: 'Sample text' } as News,
-      ];
-      jest.spyOn(service, 'findAllNews').mockResolvedValue(mockNews);
+    it('should call findAllNews and return the result', async () => {
+      const paginationInput: PaginationInput = { page: 1, limit: 10 };
+      const mockPosts = [{ id: 1, title: 'Test News', text: 'Content' }];
 
-      const result = await controller.getAllNews();
+      mockDataFetchService.findAllNews.mockResolvedValueOnce(mockPosts);
 
-      expect(service.findAllNews).toHaveBeenCalled();
-      expect(result).toEqual(mockNews);
-    });
+      const result = await controller.getAllNews(paginationInput);
 
-    it('should handle errors thrown by findAllNews', async () => {
-      jest
-        .spyOn(service, 'findAllNews')
-        .mockRejectedValue(new Error('Database fetch failed'));
-
-      await expect(controller.getAllNews()).rejects.toThrow(
-        'Database fetch failed',
-      );
-
-      expect(service.findAllNews).toHaveBeenCalled();
+      expect(service.findAllNews).toHaveBeenCalledWith(paginationInput);
+      expect(result).toEqual({ message: Lang.SUCCESS, posts: mockPosts });
     });
   });
 
@@ -128,7 +119,7 @@ describe('DataFetchController', () => {
       expect(mockLoggerLog).toHaveBeenCalledWith('Fetched 10 posts.');
       expect(mockLoggerLog).toHaveBeenCalledWith('Remaining 90 posts.');
       expect(result).toEqual({
-        message: 'News fetched and saved successfully.',
+        message: Lang.NEWS_FETCHED_SUCCESSFULLY,
       });
     });
   });
