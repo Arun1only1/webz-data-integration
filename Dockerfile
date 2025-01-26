@@ -1,3 +1,4 @@
+
 # Stage 1: Build the application
 FROM node:22-alpine AS build
 
