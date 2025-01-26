@@ -1,10 +1,10 @@
 import { Module } from '@nestjs/common';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import { DataFetchModule } from './data-fetch/data-fetch.module';
-import { ConfigModule, ConfigService } from '@nestjs/config';
 import { configValidationSchema } from './config/config.validation';
-import { TypeOrmModule } from '@nestjs/typeorm';
+import { DataFetchModule } from './data-fetch/data-fetch.module';
 
 @Module({
   imports: [
@@ -17,6 +17,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
+      inject: [ConfigService],
       useFactory: (configService: ConfigService) => ({
         type: 'postgres',
         host: configService.get('DB_HOST'),
@@ -24,11 +25,13 @@ import { TypeOrmModule } from '@nestjs/typeorm';
         username: configService.get('DB_USERNAME'),
         password: configService.get('DB_PASSWORD'),
         database: configService.get('DB_NAME'),
-        autoLoadEntities: true,
+        autoLoadEntities: configService.get('NODE_ENV') === 'dev',
         synchronize: configService.get('NODE_ENV') === 'dev',
+        entities:
+          configService.get('NODE_ENV') === 'prod'
+            ? [__dirname + '/**/*.entity{.ts,.js}']
+            : undefined,
       }),
-
-      inject: [ConfigService],
     }),
     DataFetchModule,
   ],
