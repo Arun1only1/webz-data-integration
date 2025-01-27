@@ -31,10 +31,14 @@ interface Thread {
   social: Social;
 }
 
+interface NameAndSentiment {
+  name: string;
+  sentiment: string;
+}
 interface Entities {
-  persons: string[];
-  organizations: string[];
-  locations: string[];
+  persons: NameAndSentiment[];
+  organizations: NameAndSentiment[];
+  locations: NameAndSentiment[];
 }
 
 interface Syndication {
@@ -48,7 +52,7 @@ export class NewsPost {
   uuid: string;
   url: string;
   ord_in_thread: number;
-  parent_url: string | null;
+  parent_url: string;
   author: string;
   published: string;
   title: string;

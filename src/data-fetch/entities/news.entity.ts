@@ -19,10 +19,10 @@ export class News {
   ord_in_thread: number;
 
   @Column({ nullable: true })
-  parent_url: string;
+  author: string;
 
   @Column({ nullable: true })
-  author: string;
+  parent_url: string;
 
   @Column({ nullable: true })
   published: Date;
@@ -90,5 +90,9 @@ export class News {
   };
 
   @Column('json', { nullable: true })
-  entities: { persons: string[]; organizations: string[]; locations: string[] };
+  entities: {
+    persons: { name: string; sentiment: string }[];
+    organizations: { name: string; sentiment: string }[];
+    locations: { name: string; sentiment: string }[];
+  };
 }

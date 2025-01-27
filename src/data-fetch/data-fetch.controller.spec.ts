@@ -1,126 +1,116 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import Lang from '../constants/language';
 import { DataFetchController } from './data-fetch.controller';
-import { FetchNewsInput } from './dto/input/fetch.news.input';
+import { FetchNewsInput, QueryInput } from './dto/input/fetch.news.input';
 import { PaginationInput } from './dto/input/pagination.input';
+import { GetNewsResponse } from './dto/response/get.news.response';
+import { MessageResponse } from './dto/response/message.response';
+import { News } from './entities/news.entity';
 import { DataFetchService } from './service/data-fetch.service';
+
+// Mocked dependencies
+const mockDataFetchService = {
+  processDocuments: jest.fn(),
+  findAllNews: jest.fn(),
+};
 
 describe('DataFetchController', () => {
   let controller: DataFetchController;
-  let service: DataFetchService;
-
-  const mockDataFetchService = {
-    fetchAndSaveNews: jest.fn(),
-    findAllNews: jest.fn(),
-  };
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [DataFetchController],
       providers: [
-        {
-          provide: DataFetchService,
-          useValue: mockDataFetchService,
-        },
+        { provide: DataFetchService, useValue: mockDataFetchService },
       ],
     }).compile();
 
     controller = module.get<DataFetchController>(DataFetchController);
-    service = module.get<DataFetchService>(DataFetchService);
   });
 
-  it('should be defined', () => {
-    expect(controller).toBeDefined();
+  afterEach(() => {
+    jest.clearAllMocks();
   });
 
+  // Test for POST /news/fetch
   describe('fetchAndSaveNewsData', () => {
-    it('should call fetchAndSaveNews and return a success message', async () => {
-      const mockInput: FetchNewsInput = {
-        query: [
-          { field: 'title', values: ['android', 'iPhone'], operation: 'or' },
-        ],
-      };
+    it('should call processDocuments and return success message', async () => {
+      const mockQuery: QueryInput[] = [
+        {
+          field: 'title',
+          values: ['Android', 'iPhone'],
+          operation: 'or',
+        },
+      ];
 
-      jest.spyOn(service, 'fetchAndSaveNews').mockResolvedValue(undefined);
-
-      const result = await controller.fetchAndSaveNewsData(mockInput);
-
-      expect(service.fetchAndSaveNews).toHaveBeenCalledWith(
-        mockInput.query,
-        expect.any(Function),
-      );
-      expect(result).toEqual({
-        message: Lang.NEWS_FETCHED_SUCCESSFULLY,
-      });
-    });
-
-    it('should handle errors thrown by fetchAndSaveNews', async () => {
-      const mockInput: FetchNewsInput = {
-        query: [
-          { field: 'title', values: ['android', 'iPhone'], operation: 'or' },
-        ],
-      };
-
-      jest
-        .spyOn(service, 'fetchAndSaveNews')
-        .mockRejectedValue(new Error('Fetch failed'));
-
-      await expect(controller.fetchAndSaveNewsData(mockInput)).rejects.toThrow(
-        'Fetch failed',
+      const mockFetchNewsInput: FetchNewsInput = { query: mockQuery };
+      mockDataFetchService.processDocuments.mockImplementation(
+        (query, callback) => {
+          callback(5, 0);
+        },
       );
 
-      expect(service.fetchAndSaveNews).toHaveBeenCalledWith(
-        mockInput.query,
+      const result: MessageResponse =
+        await controller.fetchAndSaveNewsData(mockFetchNewsInput);
+
+      expect(result).toEqual({ message: Lang.NEWS_FETCHED_SUCCESSFULLY });
+      expect(mockDataFetchService.processDocuments).toHaveBeenCalledWith(
+        mockQuery,
         expect.any(Function),
       );
     });
-  });
 
-  describe('getAllNews', () => {
-    it('should call findAllNews and return the result', async () => {
-      const paginationInput: PaginationInput = { page: 1, limit: 10 };
-      const mockPosts = [{ id: 1, title: 'Test News', text: 'Content' }];
+    it('should log the fetched and remaining posts', async () => {
+      const mockQuery: QueryInput[] = [
+        {
+          field: 'title',
+          values: ['Android', 'iPhone'],
+          operation: 'or',
+        },
+      ];
 
-      mockDataFetchService.findAllNews.mockResolvedValueOnce(mockPosts);
+      const mockFetchNewsInput: FetchNewsInput = { query: mockQuery };
 
-      const result = await controller.getAllNews(paginationInput);
+      mockDataFetchService.processDocuments.mockImplementation(
+        (query, callback) => {
+          callback(5, 0);
+        },
+      );
 
-      expect(service.findAllNews).toHaveBeenCalledWith(paginationInput);
-      expect(result).toEqual({ message: Lang.SUCCESS, posts: mockPosts });
-    });
-  });
-
-  describe('fetchAndSaveNewsData with callback', () => {
-    it('should invoke the callback and log fetched and remaining posts', async () => {
-      const mockInput: FetchNewsInput = {
-        query: [
-          { field: 'title', values: ['android', 'iPhone'], operation: 'or' },
-        ],
-      };
-
-      const mockLoggerLog = jest
+      // Capture the logs
+      const logSpy = jest
         .spyOn(controller['logger'], 'log')
         .mockImplementation();
 
-      jest
-        .spyOn(service, 'fetchAndSaveNews')
-        .mockImplementation(async (_, callback) => {
-          callback(10, 90); // Simulate the callback with mock data
-        });
+      await controller.fetchAndSaveNewsData(mockFetchNewsInput);
 
-      const result = await controller.fetchAndSaveNewsData(mockInput);
+      // Ensure that the logs are called with the correct values
+      expect(logSpy).toHaveBeenCalledWith('Fetched 5 posts.');
+      expect(logSpy).toHaveBeenCalledWith('Remaining 0 posts.');
+      expect(logSpy).toHaveBeenCalledTimes(2);
+    });
+  });
 
-      expect(service.fetchAndSaveNews).toHaveBeenCalledWith(
-        mockInput.query,
-        expect.any(Function),
+  // Test for GET /news/all
+  describe('getAllNews', () => {
+    it('should return paginated news', async () => {
+      const paginationInput: PaginationInput = { page: 1, limit: 10 };
+      const mockGetNewsResponse: GetNewsResponse = {
+        message: Lang.SUCCESS,
+        posts: [{ id: '1', title: 'Test News' } as unknown as News],
+        totalPage: 1,
+      };
+
+      mockDataFetchService.findAllNews.mockResolvedValueOnce(
+        mockGetNewsResponse,
       );
 
-      // Verify callback logging
-      expect(mockLoggerLog).toHaveBeenCalledWith('Fetched 10 posts.');
-      expect(mockLoggerLog).toHaveBeenCalledWith('Remaining 90 posts.');
-      expect(result).toEqual({
-        message: Lang.NEWS_FETCHED_SUCCESSFULLY,
-      });
+      const result = await controller.getAllNews(paginationInput);
+
+      expect(result).toEqual(mockGetNewsResponse);
+      expect(mockDataFetchService.findAllNews).toHaveBeenCalledWith(
+        paginationInput,
+      );
     });
   });
 });

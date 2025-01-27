@@ -1,22 +1,22 @@
-import { ConfigService } from '@nestjs/config';
 import { HttpService } from '@nestjs/axios';
-import { InjectRepository } from '@nestjs/typeorm';
 import {
   Injectable,
   InternalServerErrorException,
   Logger,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { InjectRepository } from '@nestjs/typeorm';
 
-import { AxiosError } from 'axios';
-import { Repository } from 'typeorm';
-import { catchError, lastValueFrom } from 'rxjs';
+import { lastValueFrom } from 'rxjs';
+import { DataSource, QueryRunner, Repository } from 'typeorm';
 
+import Lang from 'src/constants/language';
+import { GetNewsResponse } from '../dto/response/get.news.response';
 import { News } from '../entities/news.entity';
-import { NewsResponse } from '../dto/response/news.response';
+import { NewsPost, NewsResponse } from '../dto/response/news.response';
 import { PaginationInput } from '../dto/input/pagination.input';
-import { QueryBuilderService } from '../../utils/query.builder.service';
+import { QueryBuilderService } from 'src/utils/query.builder.service';
 import { QueryInput } from '../dto/input/fetch.news.input';
-import Lang from '../../constants/language';
 
 @Injectable()
 export class DataFetchService {
@@ -27,25 +27,27 @@ export class DataFetchService {
     private readonly configService: ConfigService,
     private readonly httpService: HttpService,
     private readonly queryBuilderService: QueryBuilderService,
+    private readonly dataSource: DataSource,
   ) {}
 
-  async findAllNews({ page, limit }: PaginationInput): Promise<News[]> {
+  async findAllNews({
+    page,
+    limit,
+  }: PaginationInput): Promise<GetNewsResponse> {
     const skip = (page - 1) * limit;
 
-    return await this.newsRepository
-      .createQueryBuilder('news')
-      .skip(skip)
-      .take(limit)
-      .getMany();
+    const [news, total] = await this.newsRepository.findAndCount({
+      skip,
+      take: limit,
+    });
+
+    // calculate total page
+    const totalPage = Math.ceil(total / limit);
+
+    return { message: Lang.SUCCESS, posts: news, totalPage };
   }
 
-  async saveNews(news: { title: string; text: string }): Promise<News> {
-    return await this.newsRepository.save(news);
-  }
-
-  // TODO: implement transaction
-  // ! block: api hit reached limit
-  async fetchAndSaveNews(
+  async processDocuments(
     query: QueryInput[],
     callback: (fetchedCount: number, remainingCount: number) => void,
   ) {
@@ -63,72 +65,108 @@ export class DataFetchService {
     // Variable to keep track of the fetched news
     let fetchedNewsCount: number = 0;
 
-    // Variable to keep track of the API response
-    let moreResultsAvailable: number = 0;
-
     // Variable to keep track of the next URL
     let nextUrl: string | null = null;
 
     // Variable to keep track of the total results
-    let totalResults: number = 0;
+    let totalNews: number = 0;
 
     // Building the query string
     const queryString = this.queryBuilderService.build(query);
 
     // First request URL
-    const firstRequestUrl = `${baseUrl}?token=${token}&q=${queryString}`;
+    const firstRequestUrl = `${baseUrl}/newsApiLite?token=${token}&q=${queryString}`;
 
-    do {
-      try {
-        // Fetching the data from the API
-        const response = await lastValueFrom(
-          this.httpService.get(nextUrl || firstRequestUrl).pipe(
-            catchError((error: AxiosError) => {
-              this.logger.error(Lang.API_HIT_ERROR, error);
-              throw new InternalServerErrorException(error.message);
-            }),
-          ),
+    //  Get the DataSource instance for transaction management
+    const queryRunner: QueryRunner = this.dataSource.createQueryRunner();
+
+    // Establish connection and start a transaction
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      do {
+        const data = await this.fetchDocumentsFromApi(
+          nextUrl || firstRequestUrl,
         );
 
-        // Extracting the data from the response
-        const data = response.data as NewsResponse;
+        const posts = data.posts;
 
-        // Checking if the data is in the expected format
-        if (data && Array.isArray(data.posts) && data.posts.length > 0) {
-          const records = data.posts;
-
-          for (const record of records) {
-            const news = {
-              ...record,
-            };
-            // Saving the news to the database
-            await this.saveNews(news);
-          }
-
-          // Updating the variables
-          nextUrl = data.next ? `${baseUrl}${data.next}` : null;
-          moreResultsAvailable = data?.moreResultsAvailable;
-          fetchedNewsCount += records.length;
-          totalResults = data?.totalResults;
-        } else {
-          this.logger.error(Lang.UNEXPECTED_API_DATA_FORMAT, data);
-          nextUrl = null;
-          throw new InternalServerErrorException(
-            Lang.UNEXPECTED_API_DATA_FORMAT,
-          );
+        if (posts.length === 0) {
+          this.logger.log('No more posts to fetch.');
+          break;
         }
-      } catch (error) {
-        this.logger.error(Lang.DATA_FETCH_ERROR, error.message);
-        nextUrl = null;
-        throw new InternalServerErrorException(error.message);
-      }
-    } while (
-      moreResultsAvailable > 0 &&
-      nextUrl &&
-      totalResults !== fetchedNewsCount
-    );
+
+        await this.savePostToDatabase(posts, queryRunner);
+
+        nextUrl = data.next ? `${baseUrl}${data.next}` : null;
+
+        if (nextUrl === null) {
+          break;
+        }
+
+        fetchedNewsCount += posts.length;
+        totalNews = data?.totalResults;
+      } while (fetchedNewsCount < totalNews);
+
+      // Commit the transaction after successfully saving all posts
+      await queryRunner.commitTransaction();
+    } catch (error) {
+      // Rollback the transaction in case of any error
+      await queryRunner.rollbackTransaction();
+
+      this.logger.error(
+        'Transaction failed. Rolling back changes.',
+        error.message,
+      );
+
+      throw new InternalServerErrorException(
+        Lang.UNEXPECTED_API_DATA_FORMAT,
+        error.message,
+      );
+    } finally {
+      await queryRunner.release();
+    }
 
     // Callback to inform the caller about the fetched news count
-    callback(fetchedNewsCount, totalResults - fetchedNewsCount);
+    const remainingNewsCount = totalNews - fetchedNewsCount;
+
+    callback(fetchedNewsCount, remainingNewsCount);
+  }
+
+  // to fetch api
+  // return NewsPost[]
+  async fetchDocumentsFromApi(apiUrl: string) {
+    try {
+      const response = await lastValueFrom(this.httpService.get(apiUrl));
+
+      return response.data as NewsResponse;
+    } catch (error) {
+      this.logger.error(`Error fetching data from API: ${error.message}`);
+
+      throw new InternalServerErrorException(
+        `Error fetching data from API: ${error.message}`,
+      );
+    }
+  }
+
+  async savePostToDatabase(posts: NewsPost[], queryRunner: QueryRunner) {
+    try {
+      await queryRunner.manager
+        .createQueryBuilder()
+        .insert()
+        .into(News)
+        .values(posts)
+        .execute();
+
+      this.logger.log(`${posts.length} documents saved successfully.`);
+    } catch (error) {
+      this.logger.error(
+        `Error saving documents to the database: ${error.message}`,
+      );
+      throw new InternalServerErrorException(
+        `Error saving documents to the database: ${error.message}`,
+      );
+    }
   }
 }

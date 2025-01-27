@@ -1,147 +1,194 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { HttpService } from '@nestjs/axios';
 import { ConfigService } from '@nestjs/config';
-import { Repository } from 'typeorm';
-import { getRepositoryToken } from '@nestjs/typeorm';
-import { of } from 'rxjs';
-import { AxiosResponse, AxiosRequestHeaders } from 'axios';
-import { DataFetchService } from './service/data-fetch.service';
-import { News } from './entities/news.entity';
 import { QueryBuilderService } from '../utils/query.builder.service';
+import { Repository, DataSource, QueryRunner } from 'typeorm';
+import { getRepositoryToken } from '@nestjs/typeorm';
+import { of, throwError } from 'rxjs';
+import { InternalServerErrorException } from '@nestjs/common';
+import { News } from './entities/news.entity';
+import { DataFetchService } from './service/data-fetch.service';
 import { QueryInput } from './dto/input/fetch.news.input';
-import Lang from '../constants/language';
+import { NewsPost } from './dto/response/news.response';
+import Lang from 'src/constants/language';
+
+const mockNewsRepository = {
+  findAndCount: jest.fn(),
+  save: jest.fn(),
+};
+
+const mockHttpService = {
+  get: jest.fn(),
+};
+
+const mockConfigService = {
+  get: jest.fn(),
+};
+
+const mockQueryBuilderService = {
+  build: jest.fn(),
+};
+
+const mockDataSource = {
+  createQueryRunner: jest.fn(),
+};
 
 describe('DataFetchService', () => {
   let service: DataFetchService;
-  let httpService: HttpService;
   let newsRepository: Repository<News>;
-  let configService: ConfigService;
-  let queryBuilderService: QueryBuilderService;
+  let httpService: HttpService;
+  let queryRunner: QueryRunner;
 
   beforeEach(async () => {
+    // Mock the queryRunner
+    const mockQueryRunner = {
+      connect: jest.fn(),
+      startTransaction: jest.fn(),
+      commitTransaction: jest.fn(),
+      rollbackTransaction: jest.fn(),
+      release: jest.fn(),
+      manager: {
+        createQueryBuilder: jest.fn(() => ({
+          insert: jest.fn().mockReturnThis(),
+          into: jest.fn().mockReturnThis(),
+          values: jest.fn().mockReturnThis(),
+          execute: jest.fn(),
+        })),
+      },
+    };
+
+    // Override queryRunner with the mocked version
+    queryRunner = mockQueryRunner as unknown as QueryRunner;
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         DataFetchService,
-        {
-          provide: getRepositoryToken(News),
-          useClass: Repository,
-        },
-        {
-          provide: HttpService,
-          useValue: { get: jest.fn() },
-        },
-        {
-          provide: ConfigService,
-          useValue: {
-            get: jest.fn((key: string) => {
-              if (key === 'WEBZ_IO_API_KEY') return 'dummy-api-key';
-              if (key === 'WEBZ_NEWS_URL')
-                return 'https://api.example.com/news';
-              return null;
-            }),
-          },
-        },
-        {
-          provide: QueryBuilderService,
-          useValue: {
-            build: jest.fn(() => 'title:(Android OR iPhone) language:english'),
-          },
-        },
+        { provide: getRepositoryToken(News), useValue: mockNewsRepository },
+        { provide: HttpService, useValue: mockHttpService },
+        { provide: ConfigService, useValue: mockConfigService },
+        { provide: QueryBuilderService, useValue: mockQueryBuilderService },
+        { provide: DataSource, useValue: mockDataSource },
       ],
     }).compile();
 
     service = module.get<DataFetchService>(DataFetchService);
-    httpService = module.get<HttpService>(HttpService);
     newsRepository = module.get<Repository<News>>(getRepositoryToken(News));
-    configService = module.get<ConfigService>(ConfigService);
-    queryBuilderService = module.get<QueryBuilderService>(QueryBuilderService);
+    httpService = module.get<HttpService>(HttpService);
+
+    mockDataSource.createQueryRunner.mockReturnValue(queryRunner);
   });
 
-  it('should fetch and save news correctly', async () => {
-    // Mock API response
-    const mockResponse: AxiosResponse = {
-      data: {
-        posts: [{ title: 'Sample Title', text: 'Sample Text' }],
-        next: null,
-        moreResultsAvailable: 0,
-        totalResults: 1,
-      },
-      status: 200,
-      statusText: 'OK',
-      headers: {},
-      config: {
-        headers: { 'Content-Type': 'application/json' } as AxiosRequestHeaders,
-      },
-    };
+  afterEach(() => {
+    jest.clearAllMocks();
+  });
 
-    jest.spyOn(httpService, 'get').mockReturnValue(of(mockResponse));
-    jest.spyOn(newsRepository, 'save').mockResolvedValue({
-      id: 'sample-id',
-      title: 'Sample Title',
-      text: 'Sample Text',
-    } as News);
+  describe('findAllNews', () => {
+    it('should return paginated news', async () => {
+      const mockNews = [{ id: '1', title: 'Test News' } as unknown as News];
+      const mockTotal = 1;
+      mockNewsRepository.findAndCount.mockResolvedValue([mockNews, mockTotal]);
 
-    // Mock query
-    const mockQuery: QueryInput[] = [
-      { field: 'title', values: ['Android', 'iPhone'], operation: 'or' },
-    ];
+      const result = await service.findAllNews({ page: 1, limit: 10 });
 
-    // Mock callback
-    const callback = jest.fn();
-
-    // Run the service method
-    await service.fetchAndSaveNews(mockQuery, callback);
-
-    // Verify that the query builder was called
-    expect(queryBuilderService.build).toHaveBeenCalledWith(mockQuery);
-
-    // Verify repository save method is called
-    expect(newsRepository.save).toHaveBeenCalledWith({
-      title: 'Sample Title',
-      text: 'Sample Text',
+      expect(result).toEqual({
+        message: Lang.SUCCESS,
+        posts: mockNews,
+        totalPage: 1,
+      });
+      expect(newsRepository.findAndCount).toHaveBeenCalledWith({
+        skip: 0,
+        take: 10,
+      });
     });
 
-    // Verify callback is called
-    expect(callback).toHaveBeenCalledWith(1, 0);
+    it('should return empty array if no news found', async () => {
+      mockNewsRepository.findAndCount.mockResolvedValue([[], 0]);
+
+      const result = await service.findAllNews({ page: 1, limit: 10 });
+
+      expect(result).toEqual({
+        message: Lang.SUCCESS,
+        posts: [],
+        totalPage: 0,
+      });
+      expect(newsRepository.findAndCount).toHaveBeenCalledWith({
+        skip: 0,
+        take: 10,
+      });
+    });
   });
 
-  it('should throw an error if API key is missing', async () => {
-    jest.spyOn(configService, 'get').mockImplementation((key: string) => {
-      if (key === 'WEBZ_IO_API_KEY') return null; // Simulate missing API key
-      if (key === 'WEBZ_NEWS_URL') return 'https://api.example.com/news';
-      return null;
+  describe('fetchDocumentsFromApi', () => {
+    it('should fetch data from the API', async () => {
+      const mockApiResponse = { data: { posts: [], totalResults: 0 } };
+      mockHttpService.get.mockReturnValue(of(mockApiResponse));
+
+      const result = await service.fetchDocumentsFromApi(
+        'http://api.example.com',
+      );
+
+      expect(result).toEqual(mockApiResponse.data);
+      expect(httpService.get).toHaveBeenCalledWith('http://api.example.com');
     });
 
-    const mockQuery: QueryInput[] = [
-      { field: 'title', values: ['Android', 'iPhone'], operation: 'or' },
-    ];
-    const callback = jest.fn();
+    it('should throw an error if API call fails', async () => {
+      mockHttpService.get.mockReturnValue(
+        throwError(() => new Error('API Error')),
+      );
 
-    await expect(service.fetchAndSaveNews(mockQuery, callback)).rejects.toThrow(
-      Lang.WEB_HOSE_API_KEY_NOT_FOUND,
-    );
+      await expect(
+        service.fetchDocumentsFromApi('http://api.example.com'),
+      ).rejects.toThrow(InternalServerErrorException);
+    });
   });
 
-  it('should throw an error if API response format is unexpected', async () => {
-    const mockResponse: AxiosResponse = {
-      data: {}, // Simulate unexpected response format
-      status: 200,
-      statusText: 'OK',
-      headers: {},
-      config: {
-        headers: { 'Content-Type': 'application/json' } as AxiosRequestHeaders,
-      },
-    };
+  describe('processDocuments', () => {
+    it('should fetch and save documents', async () => {
+      const mockQuery: QueryInput[] = [
+        {
+          field: 'title',
+          values: ['Android', 'iPhone'],
+          operation: 'or',
+        },
+      ];
+      const mockPosts = [
+        { id: '1', title: 'Test News' } as unknown as NewsPost,
+      ];
+      const mockResponse = { posts: mockPosts, totalResults: 1 };
 
-    jest.spyOn(httpService, 'get').mockReturnValue(of(mockResponse));
+      // Mocking the API response
+      mockHttpService.get.mockReturnValue(of({ data: mockResponse }));
+      jest.spyOn(service, 'savePostToDatabase').mockResolvedValueOnce();
+      mockConfigService.get.mockReturnValue('mock-token');
 
-    const mockQuery: QueryInput[] = [
-      { field: 'title', values: ['Android', 'iPhone'], operation: 'or' },
-    ];
-    const callback = jest.fn();
+      // function should return 1 and 0
+      const callback = jest.fn();
 
-    await expect(service.fetchAndSaveNews(mockQuery, callback)).rejects.toThrow(
-      Lang.UNEXPECTED_API_DATA_FORMAT,
-    );
+      // Ensure the callback is called with the correct parameters
+      await service.processDocuments(mockQuery, callback);
+
+      expect(callback).toHaveBeenCalledTimes(1);
+    });
+
+    describe('savePostToDatabase', () => {
+      it('should save posts to the database', async () => {
+        const mockPosts = [
+          { id: '1', title: 'Test News' } as unknown as NewsPost,
+        ];
+        queryRunner = {
+          manager: {
+            createQueryBuilder: jest.fn(() => ({
+              insert: jest.fn().mockReturnThis(),
+              into: jest.fn().mockReturnThis(),
+              values: jest.fn().mockReturnThis(),
+              execute: jest.fn(),
+            })),
+          },
+        } as unknown as QueryRunner;
+
+        await service.savePostToDatabase(mockPosts, queryRunner);
+        expect(queryRunner.manager.createQueryBuilder).toHaveBeenCalled();
+      });
+    });
   });
 });

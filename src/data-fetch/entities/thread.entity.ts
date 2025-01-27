@@ -59,6 +59,7 @@ export class Thread {
 
   @Column('json', { nullable: true })
   social: {
+    updated: Date;
     facebook: { likes: number; comments: number; shares: number };
     vk: { shares: number };
   };

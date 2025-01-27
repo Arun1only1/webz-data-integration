@@ -17,7 +17,7 @@ export class DataFetchController {
   async fetchAndSaveNewsData(
     @Body() { query }: FetchNewsInput,
   ): Promise<MessageResponse> {
-    await this.dataFetchService.fetchAndSaveNews(
+    await this.dataFetchService.processDocuments(
       query,
       (fetchedCount, remainingCount) => {
         this.logger.log(`Fetched ${fetchedCount} posts.`);
@@ -32,8 +32,6 @@ export class DataFetchController {
   async getAllNews(
     @Body() paginationInput: PaginationInput,
   ): Promise<GetNewsResponse> {
-    const posts = await this.dataFetchService.findAllNews(paginationInput);
-
-    return { message: Lang.SUCCESS, posts };
+    return await this.dataFetchService.findAllNews(paginationInput);
   }
 }
