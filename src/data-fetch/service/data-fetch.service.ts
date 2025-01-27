@@ -107,7 +107,7 @@ export class DataFetchService {
 
         fetchedNewsCount += posts.length;
         totalNews = data?.totalResults;
-      } while (fetchedNewsCount < totalNews);
+      } while (fetchedNewsCount !== totalNews);
 
       // Commit the transaction after successfully saving all posts
       await queryRunner.commitTransaction();
@@ -115,10 +115,7 @@ export class DataFetchService {
       // Rollback the transaction in case of any error
       await queryRunner.rollbackTransaction();
 
-      this.logger.error(
-        'Transaction failed. Rolling back changes.',
-        error.message,
-      );
+      this.logger.error(Lang.TRANSACTION_FAILED, error.message);
 
       throw new InternalServerErrorException(
         Lang.UNEXPECTED_API_DATA_FORMAT,
@@ -128,7 +125,6 @@ export class DataFetchService {
       await queryRunner.release();
     }
 
-    // Callback to inform the caller about the fetched news count
     const remainingNewsCount = totalNews - fetchedNewsCount;
 
     callback(fetchedNewsCount, remainingNewsCount);

@@ -16,9 +16,7 @@ This is a NestJS-based service for integrating with the Webz.io API (formerly We
 
 ## Prerequisites
 
-
 - **Docker**: Installed and running
-
 
 ---
 
@@ -28,20 +26,20 @@ Set up your environment variables in a `.env` file:
 
 ```plaintext
 # Application Configuration
-NODE_ENV
-API_PORT
-SYSTEM_LANGUAGE
+NODE_ENV=dev
+API_PORT=8080
+SYSTEM_LANGUAGE=EN
 
 # Database Configuration
-DB_HOST
-DB_PORT
+DB_HOST=db
+DB_PORT=5432
 DB_USERNAME
 DB_PASSWORD
 DB_NAME
 
 # Webz.io API Configuration
 WEBZ_IO_API_KEY
-WEBZ_NEWS_URL
+WEBZ_NEWS_URL='https://api.webz.io/'
 ```
 
 ---
@@ -49,12 +47,14 @@ WEBZ_NEWS_URL
 ## Installation
 
 1. **Clone the Repository**:
+
    ```bash
    git clone https://github.com/your-username/webhose-data-integration-service.git
    cd webhose-data-integration-service
    ```
 
 2. **Install Dependencies**:
+
    ```bash
    npm install
    ```
@@ -72,6 +72,7 @@ WEBZ_NEWS_URL
 ## Using Docker
 
 1. **Build and Start the Services**:
+
    ```bash
    docker compose up --build
    ```
@@ -80,15 +81,10 @@ WEBZ_NEWS_URL
    - The API will be available at [http://localhost:8080](http://localhost:8080).
    - PostgreSQL will be running on port `5432`.
 
-
-
-
 ---
-
 
 ## Resources
 
 - **Webz.io API Documentation**: [https://webz.io](https://webz.io)
 - **NestJS Documentation**: [https://docs.nestjs.com](https://docs.nestjs.com)
 - **Docker Documentation**: [https://docs.docker.com](https://docs.docker.com)
-
