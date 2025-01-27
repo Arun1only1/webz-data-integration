@@ -17,5 +17,10 @@ RUN npm install -g @nestjs/cli
 # Expose the application port
 EXPOSE 8080
 
-# Start the application in development mode
-CMD ["npm", "run", "start:dev"]
+
+# Define CMD for starting the application
+CMD ["npm", "run" ,"start:dev"]
+
+
+
+
