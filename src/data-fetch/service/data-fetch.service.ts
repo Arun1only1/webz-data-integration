@@ -93,7 +93,7 @@ export class DataFetchService {
         const posts = data.posts;
 
         if (posts.length === 0) {
-          this.logger.log('No more posts to fetch.');
+          this.logger.log(Lang.NO_MORE_POSTS);
           break;
         }
 

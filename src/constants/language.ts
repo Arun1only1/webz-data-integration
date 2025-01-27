@@ -6,6 +6,7 @@ interface ResponseMessages {
   UNEXPECTED_API_DATA_FORMAT: string;
   WEB_HOSE_API_KEY_NOT_FOUND: string;
   TRANSACTION_FAILED: string;
+  NO_MORE_POSTS: string;
 }
 
 const responseMessages: { [key: string]: ResponseMessages } = {
@@ -19,6 +20,7 @@ const responseMessages: { [key: string]: ResponseMessages } = {
     UNEXPECTED_API_DATA_FORMAT: 'Format de réponse API inattendu.',
     TRANSACTION_FAILED:
       'Échec de la transaction. Annulation des modifications.',
+    NO_MORE_POSTS: 'Plus de messages à récupérer.',
   },
   EN: {
     API_HIT_ERROR: 'Web hose api hit failed.',
@@ -28,6 +30,7 @@ const responseMessages: { [key: string]: ResponseMessages } = {
     UNEXPECTED_API_DATA_FORMAT: 'Unexpected API response format.',
     WEB_HOSE_API_KEY_NOT_FOUND: 'Web hose api key not found.',
     TRANSACTION_FAILED: 'Transaction failed. Rolling back changes.',
+    NO_MORE_POSTS: 'No more posts to fetch.',
   },
 };
 
