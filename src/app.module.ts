@@ -23,14 +23,12 @@ import { DataFetchModule } from './data-fetch/data-fetch.module';
         host: configService.get('DB_HOST'),
         port: +configService.get('DB_PORT'),
         username: configService.get('DB_USERNAME'),
+        logging: true,
         password: configService.get('DB_PASSWORD'),
         database: configService.get('DB_NAME'),
-        autoLoadEntities: configService.get('NODE_ENV') === 'dev',
+        autoLoadEntities: true,
         synchronize: configService.get('NODE_ENV') === 'dev',
-        entities:
-          configService.get('NODE_ENV') === 'prod'
-            ? [__dirname + '/**/*.entity{.ts,.js}']
-            : undefined,
+        migrations: ['dist/migration/**/*.js'],
       }),
     }),
     DataFetchModule,
