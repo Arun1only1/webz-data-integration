@@ -39,7 +39,7 @@ DB_NAME
 
 # Webz.io API Configuration
 WEBZ_IO_API_KEY
-WEBZ_NEWS_URL='https://api.webz.io/'
+WEBZ_NEWS_URL='https://api.webz.io'
 ```
 
 ---

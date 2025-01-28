@@ -1,26 +1,13 @@
-
-# Stage 1: Build the application
-FROM node:22-alpine AS build
+FROM node:22-alpine 
 
 WORKDIR /app
 
-# Install dependencies
-COPY package.json ./
-RUN npm install
+COPY package*.json ./
 
-# Copy the source code
-COPY . .
+RUN npm i 
 
-# Install Nest CLI globally
-RUN npm install -g @nestjs/cli
+COPY . . 
 
-# Expose the application port
-EXPOSE 8080
+RUN npm run build 
 
-
-# Define CMD for starting the application
-CMD ["npm", "run" ,"start:dev"]
-
-
-
-
+CMD [ "npm", "run", "start:dev" ]
