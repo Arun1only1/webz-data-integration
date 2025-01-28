@@ -61,9 +61,9 @@ export class NewsPost {
   highlightTitle: string;
   highlightThreadTitle: string;
   language: string;
-  sentiment: any;
-  categories: any;
-  topics: any;
+  sentiment: string;
+  categories: string[];
+  topics: string[];
   ai_allow: boolean;
   has_canonical: boolean;
   webz_reporter: boolean;
@@ -71,7 +71,7 @@ export class NewsPost {
   external_images: string[];
   entities: Entities;
   syndication: Syndication;
-  rating: any;
+  rating: number;
   crawled: string;
   updated: string;
 }

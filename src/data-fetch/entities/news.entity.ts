@@ -1,16 +1,12 @@
-import {
-  Column,
-  Entity,
-  JoinColumn,
-  OneToOne,
-  PrimaryGeneratedColumn,
-} from 'typeorm';
-import { Thread } from './thread.entity';
+import { Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
 
 @Entity('news')
 export class News {
   @PrimaryGeneratedColumn('uuid')
   id: string;
+
+  @Column()
+  uuid: string;
 
   @Column({ nullable: true })
   url: string;
@@ -66,9 +62,32 @@ export class News {
   @Column('simple-array', { nullable: true })
   external_images: string[];
 
-  @OneToOne(() => Thread, { cascade: true, eager: true })
-  @JoinColumn()
-  thread: Thread;
+  @Column('json', { nullable: true })
+  thread: {
+    uuid: string;
+    url: string;
+    site_full: string;
+    site: string;
+    site_section: string;
+    site_categories: string[];
+    section_title: string;
+    title: string;
+    title_full: string;
+    published: Date;
+    replies_count: number;
+    participants_count: number;
+    site_type: string;
+    country: string;
+    main_image: string;
+    performance_score: number;
+    domain_rank: number;
+    domain_rank_updated: Date;
+    social: {
+      updated: Date;
+      facebook: { likes: number; comments: number; shares: number };
+      vk: { shares: number };
+    };
+  };
 
   @Column({ default: false })
   webz_reporter: boolean;

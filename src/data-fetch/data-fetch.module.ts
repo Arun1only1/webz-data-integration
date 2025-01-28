@@ -5,14 +5,9 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { News } from './entities/news.entity';
 import { HttpModule } from '@nestjs/axios';
 import { QueryBuilderService } from 'src/utils/query.builder.service';
-import { Thread } from './entities/thread.entity';
 
 @Module({
-  imports: [
-    TypeOrmModule.forFeature([News]),
-    HttpModule,
-    TypeOrmModule.forFeature([Thread]),
-  ],
+  imports: [TypeOrmModule.forFeature([News]), HttpModule],
   controllers: [DataFetchController],
   providers: [DataFetchService, QueryBuilderService],
 })

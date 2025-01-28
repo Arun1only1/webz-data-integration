@@ -3,20 +3,22 @@ import {
   Injectable,
   InternalServerErrorException,
   Logger,
+  UnprocessableEntityException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
-
+import { promises as fs } from 'fs';
 import { lastValueFrom } from 'rxjs';
 import { DataSource, QueryRunner, Repository } from 'typeorm';
+import { NewsPost } from './../dto/response/news.response';
 
 import Lang from 'src/constants/language';
-import { GetNewsResponse } from '../dto/response/get.news.response';
-import { News } from '../entities/news.entity';
-import { NewsPost, NewsResponse } from '../dto/response/news.response';
-import { PaginationInput } from '../dto/input/pagination.input';
 import { QueryBuilderService } from 'src/utils/query.builder.service';
 import { QueryInput } from '../dto/input/fetch.news.input';
+import { PaginationInput } from '../dto/input/pagination.input';
+import { GetNewsResponse } from '../dto/response/get.news.response';
+import { NewsResponse } from '../dto/response/news.response';
+import { News } from '../entities/news.entity';
 
 @Injectable()
 export class DataFetchService {
@@ -24,6 +26,7 @@ export class DataFetchService {
 
   constructor(
     @InjectRepository(News) private readonly newsRepository: Repository<News>,
+
     private readonly configService: ConfigService,
     private readonly httpService: HttpService,
     private readonly queryBuilderService: QueryBuilderService,
@@ -77,6 +80,7 @@ export class DataFetchService {
     // First request URL
     const firstRequestUrl = `${baseUrl}/newsApiLite?token=${token}&q=${queryString}`;
 
+    console.log({ firstRequestUrl });
     //  Get the DataSource instance for transaction management
     const queryRunner: QueryRunner = this.dataSource.createQueryRunner();
 
@@ -96,6 +100,7 @@ export class DataFetchService {
           this.logger.log(Lang.NO_MORE_POSTS);
           break;
         }
+        await this.writeDataToJSON(posts);
 
         await this.savePostToDatabase(posts, queryRunner);
 
@@ -153,6 +158,7 @@ export class DataFetchService {
         .insert()
         .into(News)
         .values(posts)
+        .orIgnore()
         .execute();
 
       this.logger.log(`${posts.length} documents saved successfully.`);
@@ -163,6 +169,43 @@ export class DataFetchService {
       throw new InternalServerErrorException(
         `Error saving documents to the database: ${error.message}`,
       );
+    }
+  }
+
+  async writeDataToJSON(newsData: NewsPost[]) {
+    try {
+      const filePath = '/app/data/data.json'; // Path inside the container
+      let existingData: NewsPost[] = [];
+
+      // Check if the file exists
+      try {
+        const fileData = await fs.readFile(filePath, 'utf-8');
+        existingData = JSON.parse(fileData) as NewsPost[];
+        this.logger.log('Existing data loaded successfully.');
+      } catch (error) {
+        if (error.code === 'ENOENT') {
+          this.logger.log('File does not exist. A new file will be created.');
+        } else {
+          this.logger.error('Error parsing existing JSON data:', error.message);
+          throw new UnprocessableEntityException(
+            'Error parsing existing JSON data',
+            error.message,
+          );
+        }
+      }
+
+      // Append new data to existing data
+      existingData.push(...newsData);
+
+      // Write data back to the file
+      await fs.writeFile(
+        filePath,
+        JSON.stringify(existingData, null, 4),
+        'utf-8',
+      );
+      this.logger.log('Data has been successfully written to data.json');
+    } catch (error) {
+      this.logger.error('Error writing data to JSON file:', error.message);
     }
   }
 }
